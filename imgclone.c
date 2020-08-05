@@ -624,7 +624,7 @@ int main (int argc, char *argv[])
 		}else if (strcmp(argv[i], "-s")==0){
 			i++;
 			if (i<argc){
-				stpcpy(argv[i],src_dev);
+				stpcpy(src_dev,argv[i]);
 			}else{
 				fprintf(stderr,"Missing device for -s.\n");
 				return 1;
