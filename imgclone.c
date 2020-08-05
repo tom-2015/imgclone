@@ -618,7 +618,7 @@ int main (int argc, char *argv[])
 			if (i<argc){
 				stpcpy(dst_file,argv[i]);
 			}else{
-				fprintf(stderr,"Missing file name for -s.\n");
+				fprintf(stderr,"Missing file name for -d.\n");
 				return 1;
 			}
 		}else if (strcmp(argv[i], "-s")==0){
@@ -626,7 +626,7 @@ int main (int argc, char *argv[])
 			if (i<argc){
 				stpcpy(argv[i],src_dev);
 			}else{
-				fprintf(stderr,"Missing file name for -s.\n");
+				fprintf(stderr,"Missing device for -s.\n");
 				return 1;
 			}
 		}else if (strcmp(argv[i], "-u")==0){
@@ -634,7 +634,7 @@ int main (int argc, char *argv[])
 			if (i<argc){
 				if (argv[i][0]!='0') new_uuid=1;
 			}else{
-				fprintf(stderr,"Missing file name for -s.\n");
+				fprintf(stderr,"Missing argument for -u.\n");
 				return 1;
 			}			
 		}else if (strcmp(argv[i], "-x")==0){
