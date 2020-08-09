@@ -10,7 +10,7 @@ On the raspberry you open a terminal window and type following commands:
 * `sudo apt-get update`
 * `sudo apt-get install gcc make git`
 * `git clone https://github.com/tom-2015/imgclone.git`
-* `cd imageclone`
+* `cd imgclone`
 * `make`
 * `sudo make install`
 
