@@ -652,7 +652,7 @@ int main (int argc, char *argv[])
 	long long int extra_space=(long long int)512*(long long int)20480; //10MB extra space
 	int i;
 	
-	printf ("----    Raspberry Pi clone to image V1.1    ---\n");
+	printf ("----    Raspberry Pi clone to image V1.2    ---\n");
 	printf ("-----------------------------------------------\n");
 	printf ("---- DO NOT CHANGE FILES ON YOUR SD CARD    ---\n");
 	printf ("---- WHILE THE BACKUP PROGRAM IS RUNNING    ---\n");
