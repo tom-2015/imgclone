@@ -36,6 +36,8 @@ https://github.com/tom-2015/imgclone.git
 #include <ctype.h>
 #include <dirent.h>
 #include <stdarg.h>
+#include <pthread.h>
+#include <unistd.h>
 
 /*---------------------------------------------------------------------------*/
 /* Variable and macro definitions */
@@ -55,7 +57,15 @@ typedef struct
     char flags[10];
 } partition_t;
 
+typedef struct
+{
+	char * src;
+	char * dst;
+} copy_args;
+
 partition_t parts[MAXPART];
+
+volatile char copying=0;
 
 /*---------------------------------------------------------------------------*/
 /* System helpers */
@@ -133,14 +143,23 @@ static void escape_shell_arg(char * dst_buffer, const char * src_buffer){
 	*dst_buffer='\0';
 }
 
+void * copy_thread_func(copy_args * src_dst){
+	copying=1;
+	sys_printf ("cp -ax %s/. %s/.", src_dst->src, src_dst->dst);
+	copying=0;
+	return NULL;
+}
+
 /* clone_to_img
    This function starts clone to img file
 	@param src_dev the source device to clone
 	@param dst_file the destination disk file to clone to (.IMG)
 	@param new_uuid if 1, new uuid will be generated for destination
 	@param extra_space add extra free space to the image file for future expansion
+	@param show_progress if 1 will show copy progress
+	@param compress if 1 will run bzip2 command to compress image when finished, 2 will run gzip to compress
 */
-int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int extra_space)
+int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int extra_space, char show_progress, char compress)
 {
     char buffer[256], res[256], dev[16], uuid[64], puuid[64], npuuid[64], dst_dev[64], src_mnt[64], dst_mnt[64], dst_file_escaped[512];
     int n, p, lbl, uid, puid;
@@ -504,31 +523,51 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 			printf ("-----------------------------------------------\n");
 			printf ("----    COPYING FILES PLEASE WAIT        ------\n");
 			printf ("-----------------------------------------------\n");
-            sys_printf ("cp -ax %s/. %s/.", src_mnt, dst_mnt);
+			
+			if (show_progress){
+				int progress_max;
+				int progress_done;
+				copy_args src_dst;
+				pthread_t copy_thread;
+				
+				src_dst.src=src_mnt;
+				src_dst.dst=dst_mnt;
+				
+				if(pthread_create(&copy_thread, NULL, (void* (*)(void*)) & copy_thread_func, &src_dst)) {
+					fprintf(stderr, "Error creating copy thread\n");
+					return 27;
+				}
+				
+				// get the size to be copied
+				sprintf (buffer, "du -s %s", src_mnt);
+				get_string (buffer, res);
+				sscanf (res, "%ld", &progress_max);
+				if (progress_max < 50000) stime = 1;
+				else if (progress_max < 500000) stime = 5;
+				else stime = 10;
 
-            // get the size to be copied
-            /*sprintf (buffer, "du -s %s", src_mnt);
-            get_string (buffer, res);
-            sscanf (res, "%ld", &srcsz);
-            if (srcsz < 50000) stime = 1;
-            else if (srcsz < 500000) stime = 5;
-            else stime = 10;
-
-            // wait for the copy to complete, while updating the progress bar...
-            sprintf (buffer, "du -s %s", dst_mnt);
-            while (copying)
-            {
-                get_string (buffer, res);
-                sscanf (res, "%ld", &dstsz);
-                prog = dstsz;
-                prog /= srcsz;
-                gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (progress), prog);
-                sleep (stime);
-                CANCEL_CHECK;
-            }
-
-            gtk_progress_bar_set_fraction (GTK_PROGRESS_BAR (progress), 1.0);*/
-
+				// wait for the copy to complete, while updating the progress bar...
+				sprintf (buffer, "du -s %s", dst_mnt);
+				while (copying)
+				{
+					get_string (buffer, res);
+					sscanf (res, "%ld", &progress_done);
+					prog = progress_done;
+					prog /= progress_max;
+					printf("%d%%\n", 100 * progress_done / progress_max);
+					sleep (stime);
+				}
+				
+				/* wait for the second thread to finish */
+				if(pthread_join(copy_thread, NULL)) {
+					fprintf(stderr, "Error joining thread\n");
+					return 28;
+				}
+				
+			}else{ 
+				sys_printf ("cp -ax %s/. %s/.", src_mnt, dst_mnt);
+			}
+            
             // fix up relevant files if changing partition UUID
             if (puid && new_uuid)
             {
@@ -587,6 +626,16 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 		sys_printf ("rm %s%d", partition_name (dst_dev, dev), parts[p].pnum);
 	}
 	
+	if (compress==1){
+		printf("Compressing image.\n");
+		sys_printf("bzip2 \"%s\"", dst_file_escaped);
+	}
+
+	if (compress==2){
+		printf("Compressing image.\n");
+		sys_printf("gzip \"%s\"", dst_file_escaped);
+	}
+	
     return 0;
 }
 
@@ -598,6 +647,8 @@ int main (int argc, char *argv[])
 	char dst_file[64];
 	char src_dev[64];
 	char new_uuid=0;
+	char show_progress=0;
+	char compress=0;
 	long long int extra_space=(long long int)512*(long long int)20480; //10MB extra space
 	int i;
 	
@@ -636,7 +687,13 @@ int main (int argc, char *argv[])
 			}else{
 				fprintf(stderr,"Missing argument for -u.\n");
 				return 1;
-			}			
+			}
+		}else if (strcmp(argv[i], "-bzip2")==0){
+			compress=1;
+		}else if (strcmp(argv[i], "-gzip")==0){
+			compress=2;
+		}else if (strcmp(argv[i], "-p")==0){
+			show_progress=1;
 		}else if (strcmp(argv[i], "-x")==0){
 			i++;
 			if (i<argc){
@@ -654,6 +711,9 @@ int main (int argc, char *argv[])
 			printf("	-s <source_device>     creates a backup of source_device, optional default is /dev/mmcblk0.\n");
 			printf("	-d <destination_file>  backup to destination_file.\n");
 			printf("    -x <number>            add <number> extra bytes of free space to the last partition.\n");
+			printf("    -p			           write copy progress to output.\n");
+			printf("    -bzip2  	           use bzip2 command to compress the image after cloning.\n");
+			printf("    -gzip   	           use gzip  command to compress the image after cloning.\n");
 			return 0;
 		}else{
 			fprintf(stderr,"Invalid argument ");
@@ -669,8 +729,7 @@ int main (int argc, char *argv[])
 	}
 	
 
-	
 	printf("Cloning %s to %s\n", src_dev, dst_file);
 	
-	return clone_to_img(src_dev, dst_file, new_uuid, extra_space);
+	return clone_to_img(src_dev, dst_file, new_uuid, extra_space, show_progress, compress);
 }

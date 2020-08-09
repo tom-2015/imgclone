@@ -1,7 +1,7 @@
 all: imgclone
 
 INCL=-I/usr/include
-LINK=-L/usr/lib -L/usr/local/lib -I/usr/lib/arm-linux-gnueabihf
+LINK=-L/usr/lib -L/usr/local/lib -I/usr/lib/arm-linux-gnueabihf -lpthread
 CC=gcc -g $(INCL)
 
 imgclone: imgclone.c
