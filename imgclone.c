@@ -72,14 +72,14 @@ volatile char copying=0;
 
 /* Call a system command and read the first string returned */
 
-static int get_string (char *cmd, char *name)
+static int get_string2 (char *cmd, char *name, int print_cmd_line)
 {
     FILE *fp;
     char buf[64];
     int res;
 
     name[0] = 0;
-	printf("%s\n", cmd);
+	if (print_cmd_line) printf("%s\n", cmd);
     fp = popen (cmd, "r");
     if (fp == NULL) return 0;
     if (fgets (buf, sizeof (buf) - 1, fp) == NULL)
@@ -95,6 +95,13 @@ static int get_string (char *cmd, char *name)
         return 1;
     }
 }
+
+static int get_string (char *cmd, char *name)
+{
+    get_string2(cmd, name, 1);
+}
+
+
 
 /* System function with printf formatting */
 
@@ -525,39 +532,44 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 			printf ("-----------------------------------------------\n");
 			
 			if (show_progress){
-				int progress_max;
-				int progress_done;
+				long long int progress_max;
+				long long int progress_done;
 				copy_args src_dst;
 				pthread_t copy_thread;
 				
 				src_dst.src=src_mnt;
 				src_dst.dst=dst_mnt;
-				
+				copying=1;
 				if(pthread_create(&copy_thread, NULL, (void* (*)(void*)) & copy_thread_func, &src_dst)) {
 					fprintf(stderr, "Error creating copy thread\n");
 					return 27;
 				}
 				
 				// get the size to be copied
-				sprintf (buffer, "du -s %s", src_mnt);
+				/*sprintf (buffer, "du -s %s", src_mnt);
 				get_string (buffer, res);
-				sscanf (res, "%ld", &progress_max);
+				sscanf (res, "%ld", &progress_max);*/
+				progress_max = srcsz;
 				if (progress_max < 50000) stime = 1;
 				else if (progress_max < 500000) stime = 5;
 				else stime = 10;
 
 				// wait for the copy to complete, while updating the progress bar...
-				sprintf (buffer, "du -s %s", dst_mnt);
+				//sprintf (buffer, "du -s %s", dst_mnt);
+				sprintf (buffer, "df %s | tail -n 1 | tr -s \" \" \" \" | cut -d ' ' -f 3", dst_mnt);
+				sleep (5);
+				printf("0%%");
 				while (copying)
 				{
-					get_string (buffer, res);
-					sscanf (res, "%ld", &progress_done);
-					prog = progress_done;
-					prog /= progress_max;
-					printf("%d%%\n", 100 * progress_done / progress_max);
+					get_string2 (buffer, res, 0);
+					sscanf (res, "%lld", &progress_done);
+					prog = 100.0 * progress_done / progress_max;
+					if (prog > 100) prog=100;
+					printf("\r%d%%", (int)prog);
+					fflush(stdout);
 					sleep (stime);
 				}
-				
+				printf ("\r100%%\n");
 				/* wait for the second thread to finish */
 				if(pthread_join(copy_thread, NULL)) {
 					fprintf(stderr, "Error joining thread\n");
@@ -652,7 +664,7 @@ int main (int argc, char *argv[])
 	long long int extra_space=(long long int)512*(long long int)20480; //10MB extra space
 	int i;
 	
-	printf ("----    Raspberry Pi clone to image V1.3    ---\n");
+	printf ("----    Raspberry Pi clone to image V1.6    ---\n");
 	printf ("-----------------------------------------------\n");
 	printf ("---- DO NOT CHANGE FILES ON YOUR SD CARD    ---\n");
 	printf ("---- WHILE THE BACKUP PROGRAM IS RUNNING    ---\n");
@@ -737,6 +749,9 @@ int main (int argc, char *argv[])
 		case 2:
 			printf("gzip compress in on.\n");
 			break;
+	}
+	if (show_progress){
+		printf("Show progress is on.\n");
 	}
 	return clone_to_img(src_dev, dst_file, new_uuid, extra_space, show_progress, compress);
 }
