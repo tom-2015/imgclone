@@ -628,12 +628,12 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 	
 	if (compress==1){
 		printf("Compressing image.\n");
-		sys_printf("bzip2 \"%s\"", dst_file_escaped);
+		sys_printf("bzip2 -f \"%s\"", dst_file_escaped);
 	}
 
 	if (compress==2){
 		printf("Compressing image.\n");
-		sys_printf("gzip \"%s\"", dst_file_escaped);
+		sys_printf("gzip -f \"%s\"", dst_file_escaped);
 	}
 	
     return 0;
@@ -652,7 +652,7 @@ int main (int argc, char *argv[])
 	long long int extra_space=(long long int)512*(long long int)20480; //10MB extra space
 	int i;
 	
-	printf ("----    Raspberry Pi clone to image V1.2    ---\n");
+	printf ("----    Raspberry Pi clone to image V1.3    ---\n");
 	printf ("-----------------------------------------------\n");
 	printf ("---- DO NOT CHANGE FILES ON YOUR SD CARD    ---\n");
 	printf ("---- WHILE THE BACKUP PROGRAM IS RUNNING    ---\n");
