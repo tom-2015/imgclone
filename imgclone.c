@@ -730,6 +730,13 @@ int main (int argc, char *argv[])
 	
 
 	printf("Cloning %s to %s\n", src_dev, dst_file);
-	
+	switch (compress){
+		case 1:
+			printf("bzip2 compress is on.\n");
+			break;
+		case 2:
+			printf("gzip compress in on.\n");
+			break;
+	}
 	return clone_to_img(src_dev, dst_file, new_uuid, extra_space, show_progress, compress);
 }
