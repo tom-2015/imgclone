@@ -168,7 +168,7 @@ void * copy_thread_func(copy_args * src_dst){
 */
 int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int extra_space, char show_progress, char compress)
 {
-    char buffer[256], res[256], dev[16], uuid[64], puuid[64], npuuid[64], dst_dev[64], src_mnt[64], dst_mnt[64], dst_file_escaped[512];
+    char buffer[1024], res[256], dev[16], uuid[64], puuid[64], npuuid[64], dst_dev[64], src_mnt[64], dst_mnt[64], dst_file_escaped[512];
     int n, p, lbl, uid, puid;
     long long int srcsz, dstsz, stime, total_blocks=0, blocks_available=0, file_size_needed=0,available_free_space=0;
     double prog;
@@ -242,9 +242,7 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 	//mount last partition to get used disk space
 	if (sys_printf ("mount %s%d %s", partition_name (src_dev, dev), parts[n-1].pnum, src_mnt))
 	{
-		fprintf(stderr,"Could not mount partition ");
-		fprintf(stderr,partition_name (src_dev, dev));
-		fprintf(stderr,"\n");
+		fprintf(stderr,"Could not mount partition %s\n", partition_name (src_dev, dev));
 		return 5;
 	}
 
@@ -256,11 +254,11 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 	sscanf (res, "%lld", &blocks_available);
 	
 	long long int partition_size_used = (total_blocks - blocks_available) * 1024; //blocks used reported by df is not including all reserved space for filesystem, seems better to take the blocks available
-	printf("Used size of last partition is %lld bytes.\n", src_mnt, partition_size_used);
+	printf("Used size of last partition %s is %lld bytes.\n", src_mnt, partition_size_used);
 	
 	if (sys_printf ("umount %s", src_mnt))
 	{
-		fprintf(stderr,"Could not unmount partition.\n");
+		fputs("Could not unmount partition.\n",stderr);
 		return 6;
 	}
 	
@@ -324,9 +322,7 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
     // wipe the FAT on the target
     if (sys_printf ("dd if=/dev/zero of=%s bs=512 count=1", dst_dev))
     {
-        fprintf(stderr,"Could not write to destination device ");
-		fprintf(stderr,dst_dev);
-		fprintf(stderr,"\n");
+        fprintf(stderr,"Could not write to destination device %s\n", dst_dev);
         return 7;
     }
 	
@@ -589,16 +585,21 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
             }
 
             // unmount partitions
-            if (sys_printf ("umount %s", dst_mnt))
+            int timeout=30;
+            while (sys_printf ("umount %s", dst_mnt) && timeout>0)
             {
-                fprintf(stderr,"Could not unmount partition.\n");
-                return 19;
+                sleep(10);
+                timeout--;
+                if (timeout==0){
+                    fprintf(stderr,"Could not unmount partition %s.\n", dst_mnt);
+                    return 19;
+                }
             }
 
             if (sys_printf ("umount %s", src_mnt))
             {
-                fprintf(stderr,"Could not unmount partition.\n");
-                return 20;
+                fprintf(stderr,"Warning: could not unmount partition source partition %s.\n", src_mnt);
+                //return 20;
             }
 
 			//if (sys_printf ("umount %s%d", partition_name (dst_dev, dev), parts[p].pnum)){
@@ -627,7 +628,7 @@ int clone_to_img (char * src_dev, char * dst_file, char new_uuid, long long int 
 	
 	//release the image file
 	if (sys_printf("losetup -d %s", dst_dev)){
-		fprintf(stderr,"Error releasing device %d.\n", dst_dev);
+		fprintf(stderr,"Error releasing device %s.\n", dst_dev);
 		return 24;
 	}else{
 		printf("Backup completed!\n");
@@ -664,7 +665,7 @@ int main (int argc, char *argv[])
 	long long int extra_space=(long long int)512*(long long int)20480; //10MB extra space
 	int i;
 	
-	printf ("----    Raspberry Pi clone to image V1.6    ---\n");
+	printf ("----    Raspberry Pi clone to image V1.7    ---\n");
 	printf ("-----------------------------------------------\n");
 	printf ("---- DO NOT CHANGE FILES ON YOUR SD CARD    ---\n");
 	printf ("---- WHILE THE BACKUP PROGRAM IS RUNNING    ---\n");
@@ -728,9 +729,7 @@ int main (int argc, char *argv[])
 			printf("    -gzip   	           use gzip  command to compress the image after cloning.\n");
 			return 0;
 		}else{
-			fprintf(stderr,"Invalid argument ");
-			fprintf(stderr,argv[i]);
-			fprintf(stderr,"\n");
+			fprintf(stderr,"Invalid argument %s\n", argv[i]);
 			return 1;
 		}
 	}
