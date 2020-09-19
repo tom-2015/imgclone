@@ -8,7 +8,7 @@ imgclone: imgclone.c
 	$(CC) $(LINK) $^ -o $@
 
 clean:
-	rm *.o
+	rm imgclone
 	
 install:
 	chmod 777 imgclone
