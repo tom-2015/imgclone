@@ -98,7 +98,7 @@ static int get_string2 (char *cmd, char *name, int print_cmd_line)
 
 static int get_string (char *cmd, char *name)
 {
-    get_string2(cmd, name, 1);
+    return get_string2(cmd, name, 1);
 }
 
 
@@ -141,7 +141,7 @@ static void escape_shell_arg(char * dst_buffer, const char * src_buffer){
 	while (*src_buffer!='\0'){
 		if (*src_buffer=='"' || *src_buffer=='\\'){
 			*dst_buffer='\\';
-			*dst_buffer++;
+			dst_buffer++;
 		}
 		*dst_buffer=*src_buffer;
 		src_buffer++;
